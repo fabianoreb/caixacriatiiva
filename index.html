@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caixa Criativa - Boxes de Café da Manhã</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+  <header>
+    <img src="logo.png" alt="Logo Caixa Criativa" class="logo">
+    <nav>
+      <ul>
+        <li><a href="#produtos">Produtos</a></li>
+        <li><a href="#sobre">Sobre</a></li>
+        <li><a href="#contato">Contato</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Presenteie com carinho e sabor</h1>
+    <p>Boxes e Platters que transformam momentos simples em inesquecíveis.</p>
+  </section>
+
+  <section id="produtos" class="produtos">
+    <h2>Nossos Produtos</h2>
+    <div class="produto-lista">
+      <div class="produto">
+        <img src="img/box-p.jpg" alt="Box P">
+        <h3>Box P</h3>
+        <p>Serve 1 pessoa</p>
+        <p class="preco">R$ 69,90</p>
+        <button onclick="adicionarAoCarrinho('Box P', 'R$ 69,90')">Adicionar</button>
+      </div>
+      <div class="produto">
+        <img src="img/box-m.jpg" alt="Box M">
+        <h3>Box M</h3>
+        <p>Serve 2 pessoas</p>
+        <p class="preco">R$ 129,90</p>
+        <button onclick="adicionarAoCarrinho('Box M', 'R$ 129,90')">Adicionar</button>
+      </div>
+      <!-- Repetir estrutura para os demais produtos -->
+    </div>
+  </section>
+
+  <section class="carrinho">
+    <h2>Seu Pedido</h2>
+    <ul id="itens-carrinho"></ul>
+    <form id="formulario-pedido">
+      <input type="text" name="data" placeholder="Data da entrega" required>
+      <input type="text" name="endereco" placeholder="Endereço completo" required>
+      <input type="text" name="nome" placeholder="Nome de quem vai receber" required>
+      <input type="text" name="contato" placeholder="Contato de quem vai receber" required>
+      <button type="submit">Enviar pedido via WhatsApp</button>
+    </form>
+  </section>
+
+  <section id="sobre">
+    <h2>Sobre a Caixa Criativa</h2>
+    <p>A Caixa Criativa nasceu para transformar o café da manhã em um momento inesquecível. Entregamos experiências que encantam pelo sabor, apresentação e cuidado nos detalhes.</p>
+  </section>
+
+  <footer id="contato">
+    <p>Atendimento: Segunda a Sexta, das 08h às 18h. Entregas também aos finais de semana para pedidos feitos durante a semana.</p>
+    <p>WhatsApp para dúvidas: <a href="https://wa.me/5547997400162">(47) 99740-0162</a></p>
+    <p>Instagram: <a href="https://www.instagram.com/caixacriatiiva" target="_blank">@caixacriatiiva</a></p>
+    <p>Atendemos: Piçarras, Penha (centro) e Barra Velha (até Itajuba)</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
