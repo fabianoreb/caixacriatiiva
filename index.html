@@ -2007,64 +2007,79 @@ src="https://www.facebook.com/tr?id=220441841133853&ev=PageView&noscript=1"
      ENVIO PARA GOOGLE APPS SCRIPT
      ========================================================= */
 
-  function sendToTrackingEndpoint(payload) {
+function sendToTrackingEndpoint(payload) {
+
+  if (!TRACKING_ENDPOINT) {
+    return;
+  }
+
+  try {
+
+    var body =
+      'payload=' +
+      encodeURIComponent(
+        JSON.stringify(payload)
+      );
 
     /*
-     * Enquanto o endpoint estiver vazio,
-     * não envia nada.
+     * Envia para o Google Apps Script
+     * como formulário, evitando o preflight
+     * que pode impedir o recebimento.
      */
-    if (!TRACKING_ENDPOINT)
-      return;
 
-    try {
+    if (navigator.sendBeacon) {
 
-      var body =
-        JSON.stringify(payload);
+      var blob =
+        new Blob(
+          [body],
+          {
+            type:
+              'application/x-www-form-urlencoded;charset=UTF-8'
+          }
+        );
 
-      /*
-       * sendBeacon é ideal para cliques
-       * porque continua enviando mesmo
-       * quando o navegador abre o WhatsApp.
-       */
-
-      if (
-        navigator.sendBeacon
-      ) {
-
-        var blob =
-          new Blob(
-            [body],
-            {
-              type: 'application/json'
-            }
-          );
-
+      var enviado =
         navigator.sendBeacon(
           TRACKING_ENDPOINT,
           blob
         );
 
+      if (enviado) {
         return;
       }
+    }
 
-      /*
-       * Fallback
-       */
-      fetch(
-        TRACKING_ENDPOINT,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':
-              'application/json'
-          },
-          body: body,
-          keepalive: true
-        }
-      ).catch(function () {});
+    /*
+     * Fallback caso sendBeacon não seja utilizado.
+     */
 
-    } catch (e) {}
+    fetch(
+      TRACKING_ENDPOINT,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+
+        body: body,
+
+        keepalive: true
+      }
+    ).catch(
+      function () {}
+    );
+
+  } catch (e) {
+
+    /*
+     * O rastreamento nunca deve impedir
+     * a abertura do WhatsApp.
+     */
+
   }
+}
 
   /* =========================================================
      TRACKING DO CLIQUE NO WHATSAPP
