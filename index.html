@@ -1953,55 +1953,65 @@ src="https://www.facebook.com/tr?id=220441841133853&ev=PageView&noscript=1"
      ADICIONA ID DO LEAD AO WHATSAPP
      ========================================================= */
 
-  function buildWhatsappUrl(link) {
+function buildWhatsappUrl(link) {
 
-    var href =
-      link.getAttribute('href') || '';
+  var href =
+    link.getAttribute('href') || '';
 
-    if (
-      !href ||
-      href.indexOf('wa.me/') === -1
-    ) {
-      return href;
-    }
+  if (
+    !href ||
+    href.indexOf('wa.me/') === -1
+  ) {
+    return href;
+  }
 
-    var leadId = getLeadId();
+  /*
+   * Mantém a mensagem original exatamente como
+   * foi criada para o cliente.
+   *
+   * O Lead ID continua existindo internamente
+   * no rastreamento do site e na aba Eventos,
+   * mas NÃO aparece no WhatsApp.
+   */
 
-    var originalMessage =
-      getWhatsappMessage(link);
+  var originalMessage =
+    getWhatsappMessage(link);
+
+  try {
+
+    var base =
+      href.split('?')[0];
 
     /*
-     * Mantemos a mensagem normal para o cliente
-     * e acrescentamos uma pequena referência.
-     *
-     * Isso será importante para ligar:
-     *
-     * SITE → LEAD_ID → WHATSAPP → VENDA
+     * Se já existir uma mensagem pré-definida,
+     * mantém exatamente essa mensagem.
      */
 
-    var newMessage =
-      originalMessage
-        ? originalMessage +
-          '\n\nRef.: ' +
-          leadId
-        : 'Olá! Ref.: ' + leadId;
-
-    try {
-
-      var base =
-        href.split('?')[0];
+    if (originalMessage) {
 
       return (
         base +
         '?text=' +
-        encodeURIComponent(newMessage)
+        encodeURIComponent(
+          originalMessage
+        )
       );
 
-    } catch (e) {
-
-      return href;
     }
+
+    /*
+     * Se não houver mensagem pré-definida,
+     * mantém o link original.
+     */
+
+    return href;
+
+  } catch (e) {
+
+    return href;
+
   }
+}
 
   /* =========================================================
      ENVIO PARA GOOGLE APPS SCRIPT
