@@ -543,7 +543,7 @@ src="https://www.facebook.com/tr?id=220441841133853&ev=PageView&noscript=1"
   object-fit: cover;  /* Preenche perfeitamente as bordas sem distorcer */
 }
 
-    }
+    
     .card:hover .card-img-wrap img { transform: scale(1.06); }
     .card-tag {
       position: absolute;
@@ -1582,160 +1582,936 @@ src="https://www.facebook.com/tr?id=220441841133853&ev=PageView&noscript=1"
   </script>
 
 
-  <script>
-    (function () {
-      function getSectionName(link) {
-        var section = link.closest('section, nav, footer, .topbar');
-        if (!section) return 'site';
-        if (section.classList.contains('hero')) return 'hero';
-        if (section.classList.contains('navbar')) return 'navbar';
-        if (section.classList.contains('produtos')) return 'produtos';
-        if (section.classList.contains('prova-social')) return 'prova_social';
-        if (section.classList.contains('diferenciais')) return 'diferenciais';
-        if (section.classList.contains('como')) return 'como_funciona';
-        if (section.classList.contains('emocional')) return 'emocional';
-        if (section.classList.contains('cta-final')) return 'cta_final';
-        if (section.tagName && section.tagName.toLowerCase() === 'footer') return 'footer';
-        if (section.classList.contains('topbar')) return 'topbar';
-        return (section.id || section.className || 'site').toString().trim().replace(/\s+/g, '_').toLowerCase();
+<script>
+(function () {
+
+  /* =========================================================
+     CAIXA CRIATIVA — RASTREAMENTO V2
+     Google Ads + Meta Ads + GA4 + WhatsApp
+     ========================================================= */
+
+  var STORAGE_KEY = 'caixa_criativa_tracking_v2';
+
+  /*
+   * IMPORTANTE:
+   * Por enquanto deixe vazio.
+   *
+   * Depois vamos colocar aqui a URL do Apps Script
+   * responsável por registrar os cliques no Google Sheets.
+   */
+  var TRACKING_ENDPOINT = '';
+
+  /* =========================================================
+     UTILITÁRIOS
+     ========================================================= */
+
+  function generateId() {
+    try {
+      if (window.crypto && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+    } catch (e) {}
+
+    return 'CC-' +
+      Date.now().toString(36).toUpperCase() +
+      '-' +
+      Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  function getStoredData() {
+    try {
+      return JSON.parse(
+        localStorage.getItem(STORAGE_KEY) || '{}'
+      );
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveStoredData(data) {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(data)
+      );
+    } catch (e) {
+      // Não interrompe o site se o navegador bloquear storage.
+    }
+  }
+
+  function getUrlParams() {
+    try {
+      return new URLSearchParams(window.location.search);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* =========================================================
+     ID ÚNICO DO VISITANTE
+     ========================================================= */
+
+  function getLeadId() {
+
+    var data = getStoredData();
+
+    if (!data.lead_id) {
+      data.lead_id = generateId();
+      data.created_at = new Date().toISOString();
+    }
+
+    saveStoredData(data);
+
+    return data.lead_id;
+  }
+
+  /* =========================================================
+     CAPTURA DE ORIGEM / GOOGLE ADS / META ADS
+     ========================================================= */
+
+  function captureAttribution() {
+
+    var params = getUrlParams();
+    var data = getStoredData();
+
+    if (!params) {
+      return data;
+    }
+
+    var trackingKeys = [
+      'gclid',
+      'gbraid',
+      'wbraid',
+      'fbclid',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_content',
+      'utm_term'
+    ];
+
+    trackingKeys.forEach(function (key) {
+
+      var value = params.get(key);
+
+      if (value) {
+
+        /*
+         * Última origem encontrada
+         */
+        data['last_' + key] = value;
+
+        /*
+         * Primeira origem encontrada
+         */
+        if (!data['first_' + key]) {
+          data['first_' + key] = value;
+        }
+      }
+    });
+
+    /*
+     * Página onde a pessoa entrou no site
+     */
+    if (!data.first_page) {
+      data.first_page = window.location.href;
+    }
+
+    if (!data.first_page_path) {
+      data.first_page_path =
+        window.location.pathname +
+        window.location.search;
+    }
+
+    /*
+     * Última página visitada
+     */
+    data.last_page = window.location.href;
+
+    data.last_visit_at = new Date().toISOString();
+
+    /*
+     * Identifica automaticamente algumas origens
+     */
+    if (
+      data.first_gclid ||
+      data.last_gclid ||
+      data.first_gbraid ||
+      data.last_gbraid ||
+      data.first_wbraid ||
+      data.last_wbraid
+    ) {
+      data.first_channel = 'Google Ads';
+    }
+
+    if (
+      data.first_fbclid ||
+      data.last_fbclid
+    ) {
+      data.first_channel = 'Meta Ads';
+    }
+
+    saveStoredData(data);
+
+    return data;
+  }
+
+  /* =========================================================
+     DADOS DE ATRIBUIÇÃO
+     ========================================================= */
+
+  function getAttributionData() {
+
+    var data = getStoredData();
+
+    return {
+      lead_id: data.lead_id || getLeadId(),
+
+      first_channel: data.first_channel || '',
+      
+      first_gclid: data.first_gclid || '',
+      last_gclid: data.last_gclid || '',
+
+      first_gbraid: data.first_gbraid || '',
+      last_gbraid: data.last_gbraid || '',
+
+      first_wbraid: data.first_wbraid || '',
+      last_wbraid: data.last_wbraid || '',
+
+      first_fbclid: data.first_fbclid || '',
+      last_fbclid: data.last_fbclid || '',
+
+      first_utm_source: data.first_utm_source || '',
+      first_utm_medium: data.first_utm_medium || '',
+      first_utm_campaign: data.first_utm_campaign || '',
+      first_utm_content: data.first_utm_content || '',
+      first_utm_term: data.first_utm_term || '',
+
+      last_utm_source: data.last_utm_source || '',
+      last_utm_medium: data.last_utm_medium || '',
+      last_utm_campaign: data.last_utm_campaign || '',
+      last_utm_content: data.last_utm_content || '',
+      last_utm_term: data.last_utm_term || '',
+
+      first_page: data.first_page || '',
+      first_page_path: data.first_page_path || '',
+
+      last_page: data.last_page || '',
+      last_visit_at: data.last_visit_at || ''
+    };
+  }
+
+  /* =========================================================
+     IDENTIFICAÇÃO DA SEÇÃO
+     ========================================================= */
+
+  function getSectionName(link) {
+
+    var section = link.closest(
+      'section, nav, footer, .topbar'
+    );
+
+    if (!section) return 'site';
+
+    if (section.classList.contains('hero'))
+      return 'hero';
+
+    if (section.classList.contains('navbar'))
+      return 'navbar';
+
+    if (section.classList.contains('produtos'))
+      return 'produtos';
+
+    if (section.classList.contains('prova-social'))
+      return 'prova_social';
+
+    if (section.classList.contains('diferenciais'))
+      return 'diferenciais';
+
+    if (section.classList.contains('como'))
+      return 'como_funciona';
+
+    if (section.classList.contains('emocional'))
+      return 'emocional';
+
+    if (section.classList.contains('cta-final'))
+      return 'cta_final';
+
+    if (
+      section.tagName &&
+      section.tagName.toLowerCase() === 'footer'
+    )
+      return 'footer';
+
+    if (section.classList.contains('topbar'))
+      return 'topbar';
+
+    return (
+      section.id ||
+      section.className ||
+      'site'
+    )
+      .toString()
+      .trim()
+      .replace(/\s+/g, '_')
+      .toLowerCase();
+  }
+
+  /* =========================================================
+     NOME DO BOTÃO / PRODUTO
+     ========================================================= */
+
+  function getWhatsappLabel(link) {
+
+    if (link.dataset.whatsappLabel)
+      return link.dataset.whatsappLabel;
+
+    var title =
+      (link.getAttribute('title') || '').trim();
+
+    if (title)
+      return title;
+
+    var card = link.closest('.card');
+
+    if (card) {
+
+      var cardTitle =
+        card.querySelector('.card-title');
+
+      if (cardTitle)
+        return cardTitle.textContent.trim();
+    }
+
+    if (link.classList.contains('float-wpp'))
+      return 'Botao flutuante WhatsApp';
+
+    if (link.classList.contains('footer-wpp'))
+      return 'Botao WhatsApp rodape';
+
+    if (link.classList.contains('btn-wpp')) {
+
+      var section = getSectionName(link);
+
+      if (section === 'navbar')
+        return 'Botao WhatsApp navbar';
+
+      if (section === 'hero')
+        return 'Botao WhatsApp hero';
+
+      if (section === 'emocional')
+        return 'Botao WhatsApp bloco emocional';
+
+      if (section === 'cta_final')
+        return 'Botao WhatsApp CTA final';
+
+      if (section === 'footer')
+        return 'Botao WhatsApp footer';
+    }
+
+    var text =
+      (link.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (text)
+      return text;
+
+    return 'WhatsApp';
+  }
+
+  /* =========================================================
+     EXTRAI TEXTO ORIGINAL DO WHATSAPP
+     ========================================================= */
+
+  function getWhatsappMessage(link) {
+
+    var href =
+      link.getAttribute('href') || '';
+
+    try {
+
+      var match =
+        href.match(/[?&]text=([^&]+)/);
+
+      if (
+        match &&
+        match[1]
+      ) {
+
+        return decodeURIComponent(
+          match[1]
+        ).replace(/\+/g, ' ');
       }
 
-      function getWhatsappLabel(link) {
-        if (link.dataset.whatsappLabel) return link.dataset.whatsappLabel;
+    } catch (e) {}
 
-        var title = (link.getAttribute('title') || '').trim();
-        if (title) return title;
+    return '';
+  }
 
-        var card = link.closest('.card');
-        if (card) {
-          var cardTitle = card.querySelector('.card-title');
-          if (cardTitle) return cardTitle.textContent.trim();
-        }
+  /* =========================================================
+     ADICIONA ID DO LEAD AO WHATSAPP
+     ========================================================= */
 
-        if (link.classList.contains('float-wpp')) return 'Botao flutuante WhatsApp';
-        if (link.classList.contains('footer-wpp')) return 'Botao WhatsApp rodape';
-        if (link.classList.contains('btn-wpp')) {
-          var section = getSectionName(link);
-          if (section === 'navbar') return 'Botao WhatsApp navbar';
-          if (section === 'hero') return 'Botao WhatsApp hero';
-          if (section === 'emocional') return 'Botao WhatsApp bloco emocional';
-          if (section === 'cta_final') return 'Botao WhatsApp CTA final';
-          if (section === 'footer') return 'Botao WhatsApp footer';
-        }
+  function buildWhatsappUrl(link) {
 
-        var text = (link.textContent || '').replace(/\s+/g, ' ').trim();
-        if (text) return text;
+    var href =
+      link.getAttribute('href') || '';
 
-        try {
-          var href = link.getAttribute('href') || '';
-          var match = href.match(/[?&]text=([^&]+)/);
-          if (match && match[1]) return decodeURIComponent(match[1]).replace(/\+/g, ' ');
-        } catch (e) {}
+    if (
+      !href ||
+      href.indexOf('wa.me/') === -1
+    ) {
+      return href;
+    }
 
-        return 'WhatsApp';
-      }
+    var leadId = getLeadId();
 
-      function getUtmData() {
-        var keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
-        var data = {};
+    var originalMessage =
+      getWhatsappMessage(link);
 
-        try {
-          var params = new URLSearchParams(window.location.search);
-          var stored = JSON.parse(sessionStorage.getItem('caixa_criativa_utm') || '{}');
+    /*
+     * Mantemos a mensagem normal para o cliente
+     * e acrescentamos uma pequena referência.
+     *
+     * Isso será importante para ligar:
+     *
+     * SITE → LEAD_ID → WHATSAPP → VENDA
+     */
 
-          keys.forEach(function (key) {
-            var value = params.get(key);
-            if (value) {
-              stored[key] = value;
+    var newMessage =
+      originalMessage
+        ? originalMessage +
+          '\n\nRef.: ' +
+          leadId
+        : 'Olá! Ref.: ' + leadId;
+
+    try {
+
+      var base =
+        href.split('?')[0];
+
+      return (
+        base +
+        '?text=' +
+        encodeURIComponent(newMessage)
+      );
+
+    } catch (e) {
+
+      return href;
+    }
+  }
+
+  /* =========================================================
+     ENVIO PARA GOOGLE APPS SCRIPT
+     ========================================================= */
+
+  function sendToTrackingEndpoint(payload) {
+
+    /*
+     * Enquanto o endpoint estiver vazio,
+     * não envia nada.
+     */
+    if (!TRACKING_ENDPOINT)
+      return;
+
+    try {
+
+      var body =
+        JSON.stringify(payload);
+
+      /*
+       * sendBeacon é ideal para cliques
+       * porque continua enviando mesmo
+       * quando o navegador abre o WhatsApp.
+       */
+
+      if (
+        navigator.sendBeacon
+      ) {
+
+        var blob =
+          new Blob(
+            [body],
+            {
+              type: 'application/json'
             }
-          });
+          );
 
-          sessionStorage.setItem('caixa_criativa_utm', JSON.stringify(stored));
-          data = stored;
-        } catch (e) {
-          // Não interrompe o rastreamento caso o navegador bloqueie storage.
-        }
+        navigator.sendBeacon(
+          TRACKING_ENDPOINT,
+          blob
+        );
 
-        return data;
+        return;
       }
 
-      function trackWhatsappClick(link) {
-        var label = getWhatsappLabel(link);
-        var section = getSectionName(link);
-        var href = link.href || link.getAttribute('href') || '';
-        var buttonText = (link.textContent || '').replace(/\s+/g, ' ').trim();
-        var utm = getUtmData();
-
-        // 1) Google Tag Manager / GA4
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'click_whatsapp',
-          button_name: label,
-          button_location: section,
-          button_text: buttonText,
-          link_url: href,
-          utm_source: utm.utm_source || '(direct)',
-          utm_medium: utm.utm_medium || '(none)',
-          utm_campaign: utm.utm_campaign || '(not set)',
-          utm_content: utm.utm_content || '(not set)',
-          utm_term: utm.utm_term || '(not set)'
-        });
-
-        // 2) Google Analytics / Google Ads
-        if (typeof window.gtag === 'function') {
-          window.gtag('event', 'click_whatsapp', {
-            event_category: 'engagement',
-            event_label: label,
-            button_name: label,
-            button_location: section,
-            button_text: buttonText,
-            link_url: href,
-            utm_source: utm.utm_source || '(direct)',
-            utm_medium: utm.utm_medium || '(none)',
-            utm_campaign: utm.utm_campaign || '(not set)',
-            transport_type: 'beacon'
-          });
+      /*
+       * Fallback
+       */
+      fetch(
+        TRACKING_ENDPOINT,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+          body: body,
+          keepalive: true
         }
+      ).catch(function () {});
 
-        // 3) Meta Pixel — conversão de contato via WhatsApp
-        // O evento padrão Contact pode ser usado no Gerenciador de Eventos/Anúncios da Meta.
-        if (typeof window.fbq === 'function') {
-          window.fbq('track', 'Contact', {
-            content_name: 'WhatsApp - ' + label,
-            content_category: 'WhatsApp',
-            button_name: label,
-            button_location: section,
-            utm_source: utm.utm_source || '(direct)',
-            utm_medium: utm.utm_medium || '(none)',
-            utm_campaign: utm.utm_campaign || '(not set)',
-            utm_content: utm.utm_content || '(not set)'
-          });
+    } catch (e) {}
+  }
+
+  /* =========================================================
+     TRACKING DO CLIQUE NO WHATSAPP
+     ========================================================= */
+
+  function trackWhatsappClick(link) {
+
+    var attribution =
+      getAttributionData();
+
+    var label =
+      getWhatsappLabel(link);
+
+    var section =
+      getSectionName(link);
+
+    var originalHref =
+      link.getAttribute('href') || '';
+
+    var whatsappUrl =
+      buildWhatsappUrl(link);
+
+    var buttonText =
+      (link.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    var payload = {
+
+      event: 'click_whatsapp',
+
+      event_id:
+        generateId(),
+
+      timestamp:
+        new Date().toISOString(),
+
+      lead_id:
+        attribution.lead_id,
+
+      button_name:
+        label,
+
+      button_location:
+        section,
+
+      button_text:
+        buttonText,
+
+      whatsapp_url:
+        whatsappUrl,
+
+      original_whatsapp_url:
+        originalHref,
+
+      product:
+        label,
+
+      /*
+       * Google
+       */
+      gclid:
+        attribution.last_gclid ||
+        attribution.first_gclid ||
+        '',
+
+      gbraid:
+        attribution.last_gbraid ||
+        attribution.first_gbraid ||
+        '',
+
+      wbraid:
+        attribution.last_wbraid ||
+        attribution.first_wbraid ||
+        '',
+
+      /*
+       * Meta
+       */
+      fbclid:
+        attribution.last_fbclid ||
+        attribution.first_fbclid ||
+        '',
+
+      /*
+       * UTMs
+       */
+      utm_source:
+        attribution.last_utm_source ||
+        attribution.first_utm_source ||
+        '',
+
+      utm_medium:
+        attribution.last_utm_medium ||
+        attribution.first_utm_medium ||
+        '',
+
+      utm_campaign:
+        attribution.last_utm_campaign ||
+        attribution.first_utm_campaign ||
+        '',
+
+      utm_content:
+        attribution.last_utm_content ||
+        attribution.first_utm_content ||
+        '',
+
+      utm_term:
+        attribution.last_utm_term ||
+        attribution.first_utm_term ||
+        '',
+
+      first_channel:
+        attribution.first_channel || '',
+
+      first_page:
+        attribution.first_page || '',
+
+      first_page_path:
+        attribution.first_page_path || '',
+
+      /*
+       * Página atual
+       */
+      current_page:
+        window.location.href
+    };
+
+    /* =======================================================
+       1. DATA LAYER / GOOGLE TAG MANAGER
+       ======================================================= */
+
+    window.dataLayer =
+      window.dataLayer || [];
+
+    window.dataLayer.push({
+
+      event:
+        'click_whatsapp',
+
+      lead_id:
+        payload.lead_id,
+
+      button_name:
+        payload.button_name,
+
+      button_location:
+        payload.button_location,
+
+      button_text:
+        payload.button_text,
+
+      product:
+        payload.product,
+
+      gclid:
+        payload.gclid,
+
+      gbraid:
+        payload.gbraid,
+
+      wbraid:
+        payload.wbraid,
+
+      fbclid:
+        payload.fbclid,
+
+      utm_source:
+        payload.utm_source,
+
+      utm_medium:
+        payload.utm_medium,
+
+      utm_campaign:
+        payload.utm_campaign,
+
+      utm_content:
+        payload.utm_content,
+
+      utm_term:
+        payload.utm_term
+    });
+
+    /* =======================================================
+       2. GA4 / GOOGLE ADS
+       ======================================================= */
+
+    if (
+      typeof window.gtag === 'function'
+    ) {
+
+      window.gtag(
+        'event',
+        'click_whatsapp',
+        {
+
+          event_category:
+            'engagement',
+
+          event_label:
+            label,
+
+          lead_id:
+            payload.lead_id,
+
+          button_name:
+            label,
+
+          button_location:
+            section,
+
+          button_text:
+            buttonText,
+
+          product:
+            label,
+
+          gclid:
+            payload.gclid,
+
+          gbraid:
+            payload.gbraid,
+
+          wbraid:
+            payload.wbraid,
+
+          fbclid:
+            payload.fbclid,
+
+          utm_source:
+            payload.utm_source,
+
+          utm_medium:
+            payload.utm_medium,
+
+          utm_campaign:
+            payload.utm_campaign,
+
+          utm_content:
+            payload.utm_content,
+
+          utm_term:
+            payload.utm_term,
+
+          transport_type:
+            'beacon'
         }
-      }
+      );
+    }
 
-      document.addEventListener('DOMContentLoaded', function () {
-        // Registra UTMs da visita assim que a página carrega.
-        var initialUtm = getUtmData();
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'utm_captured',
-          utm_source: initialUtm.utm_source || '(direct)',
-          utm_medium: initialUtm.utm_medium || '(none)',
-          utm_campaign: initialUtm.utm_campaign || '(not set)',
-          utm_content: initialUtm.utm_content || '(not set)',
-          utm_term: initialUtm.utm_term || '(not set)'
-        });
+    /* =======================================================
+       3. META PIXEL
+       ======================================================= */
 
-        var whatsappLinks = document.querySelectorAll('a[href*="wa.me/"]');
+    if (
+      typeof window.fbq === 'function'
+    ) {
 
-        whatsappLinks.forEach(function (link) {
-          link.addEventListener('click', function () {
-            trackWhatsappClick(link);
-          }, { passive: true });
-        });
+      window.fbq(
+        'track',
+        'Contact',
+        {
+
+          content_name:
+            'WhatsApp - ' + label,
+
+          content_category:
+            'WhatsApp',
+
+          lead_id:
+            payload.lead_id,
+
+          button_name:
+            label,
+
+          button_location:
+            section,
+
+          product:
+            label,
+
+          utm_source:
+            payload.utm_source,
+
+          utm_medium:
+            payload.utm_medium,
+
+          utm_campaign:
+            payload.utm_campaign,
+
+          utm_content:
+            payload.utm_content,
+
+          utm_term:
+            payload.utm_term
+        }
+      );
+    }
+
+    /* =======================================================
+       4. GOOGLE SHEETS / APPS SCRIPT
+       ======================================================= */
+
+    sendToTrackingEndpoint(
+      payload
+    );
+
+    /*
+     * Salva último clique localmente.
+     */
+    var data =
+      getStoredData();
+
+    data.last_whatsapp_click =
+      payload;
+
+    saveStoredData(
+      data
+    );
+
+    /*
+     * Atualiza o link real.
+     *
+     * IMPORTANTE:
+     * usamos apenas no clique atual.
+     */
+    link.setAttribute(
+      'href',
+      whatsappUrl
+    );
+  }
+
+  /* =========================================================
+     INICIALIZAÇÃO
+     ========================================================= */
+
+  document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+      /*
+       * Cria o ID do visitante
+       */
+      getLeadId();
+
+      /*
+       * Captura Google/Meta/UTMs
+       */
+      var attribution =
+        captureAttribution();
+
+      /*
+       * Evento inicial de captura
+       */
+      window.dataLayer =
+        window.dataLayer || [];
+
+      window.dataLayer.push({
+
+        event:
+          'utm_captured',
+
+        lead_id:
+          attribution.lead_id,
+
+        first_channel:
+          attribution.first_channel || '',
+
+        gclid:
+          attribution.last_gclid ||
+          attribution.first_gclid ||
+          '',
+
+        gbraid:
+          attribution.last_gbraid ||
+          attribution.first_gbraid ||
+          '',
+
+        wbraid:
+          attribution.last_wbraid ||
+          attribution.first_wbraid ||
+          '',
+
+        fbclid:
+          attribution.last_fbclid ||
+          attribution.first_fbclid ||
+          '',
+
+        utm_source:
+          attribution.last_utm_source ||
+          attribution.first_utm_source ||
+          '',
+
+        utm_medium:
+          attribution.last_utm_medium ||
+          attribution.first_utm_medium ||
+          '',
+
+        utm_campaign:
+          attribution.last_utm_campaign ||
+          attribution.first_utm_campaign ||
+          '',
+
+        utm_content:
+          attribution.last_utm_content ||
+          attribution.first_utm_content ||
+          '',
+
+        utm_term:
+          attribution.last_utm_term ||
+          attribution.first_utm_term ||
+          ''
       });
-    })();
-  </script>
+
+      /*
+       * Localiza todos os botões WhatsApp
+       */
+      var whatsappLinks =
+        document.querySelectorAll(
+          'a[href*="wa.me/"]'
+        );
+
+      whatsappLinks.forEach(
+        function (link) {
+
+          link.addEventListener(
+            'click',
+            function () {
+
+              trackWhatsappClick(
+                link
+              );
+
+            },
+            {
+              passive: true
+            }
+          );
+
+        }
+      );
+
+    }
+  );
+
+})();
+</script>
 
 </body>
 </html>
