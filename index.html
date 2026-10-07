@@ -1567,5 +1567,1834 @@ src="https://www.facebook.com/tr?id=220441841133853&ev=PageView&noscript=1"
     });
   </script>
 
+
+  <script>
+(function () {
+
+  /* =========================================================
+     CAIXA CRIATIVA — RASTREAMENTO V3
+     Meta Ads + Google Ads + GA4 + WhatsApp
+     
+     FLUXO PRINCIPAL:
+     Anúncio → Site → Produto → WhatsApp
+     
+     IMPORTANTE:
+     O Lead ID é interno e NÃO aparece no WhatsApp.
+     ========================================================= */
+
+  var STORAGE_KEY = 'caixa_criativa_tracking_v3';
+
+  var TRACKING_ENDPOINT =
+    'https://script.google.com/macros/s/AKfycbwI3epxrNxa81B7m8C7dIfRcePHWKEr-9CMhO7PpIVdyJTeLBHbe-a4q7mT3PTXLxi15g/exec';
+
+
+  /* =========================================================
+     UTILITÁRIOS
+     ========================================================= */
+
+  function generateId() {
+
+    try {
+
+      if (
+        window.crypto &&
+        crypto.randomUUID
+      ) {
+        return crypto.randomUUID();
+      }
+
+    } catch (e) {}
+
+    return 'CC-' +
+      Date.now().toString(36).toUpperCase() +
+      '-' +
+      Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
+  }
+
+
+  function getStoredData() {
+
+    try {
+
+      return JSON.parse(
+        localStorage.getItem(
+          STORAGE_KEY
+        ) || '{}'
+      );
+
+    } catch (e) {
+
+      return {};
+
+    }
+  }
+
+
+  function saveStoredData(data) {
+
+    try {
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(data)
+      );
+
+    } catch (e) {
+
+      /* Não interrompe o site. */
+
+    }
+  }
+
+
+  function getUrlParams() {
+
+    try {
+
+      return new URLSearchParams(
+        window.location.search
+      );
+
+    } catch (e) {
+
+      return null;
+
+    }
+  }
+
+
+  /* =========================================================
+     LEAD ID INTERNO
+     ========================================================= */
+
+  function getLeadId() {
+
+    var data =
+      getStoredData();
+
+    if (!data.lead_id) {
+
+      data.lead_id =
+        generateId();
+
+      data.created_at =
+        new Date().toISOString();
+    }
+
+    saveStoredData(data);
+
+    return data.lead_id;
+  }
+
+
+  /* =========================================================
+     COOKIES META
+     ========================================================= */
+
+  function getCookie(name) {
+
+    try {
+
+      var cookies =
+        document.cookie.split(';');
+
+      for (
+        var i = 0;
+        i < cookies.length;
+        i++
+      ) {
+
+        var cookie =
+          cookies[i].trim();
+
+        if (
+          cookie.indexOf(
+            name + '='
+          ) === 0
+        ) {
+
+          return decodeURIComponent(
+            cookie.substring(
+              name.length + 1
+            )
+          );
+        }
+      }
+
+    } catch (e) {}
+
+    return '';
+  }
+
+
+  /* =========================================================
+     FBC / FBP
+     
+     fbp:
+     Cookie criada pelo Meta Pixel.
+
+     fbc:
+     Identificador derivado do fbclid.
+     
+     Isso NÃO aparece para o cliente.
+     ========================================================= */
+
+  function getMetaBrowserData() {
+
+    var params =
+      getUrlParams();
+
+    var fbclid =
+      params
+        ? params.get('fbclid')
+        : '';
+
+    var fbp =
+      getCookie('_fbp');
+
+    var fbc =
+      getCookie('_fbc');
+
+    /*
+     * Se existe fbclid na URL e ainda não
+     * temos fbc, criamos o valor no formato
+     * esperado para atribuição web.
+     */
+
+    if (
+      fbclid &&
+      !fbc
+    ) {
+
+      fbc =
+        'fb.1.' +
+        Date.now() +
+        '.' +
+        fbclid;
+
+    }
+
+    return {
+
+      fbp: fbp || '',
+
+      fbc: fbc || ''
+
+    };
+  }
+
+
+  /* =========================================================
+     CAPTURA DE ATRIBUIÇÃO
+     ========================================================= */
+
+  function captureAttribution() {
+
+    var params =
+      getUrlParams();
+
+    var data =
+      getStoredData();
+
+    if (!params) {
+
+      return data;
+
+    }
+
+
+    var trackingKeys = [
+
+      'gclid',
+      'gbraid',
+      'wbraid',
+      'fbclid',
+
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_content',
+      'utm_term'
+
+    ];
+
+
+    /*
+     * Guarda os parâmetros encontrados
+     * nesta visita.
+     */
+
+    var current = {};
+
+
+    trackingKeys.forEach(
+      function (key) {
+
+        var value =
+          params.get(key);
+
+        if (value) {
+
+          current[key] =
+            value;
+
+          /*
+           * Última origem.
+           */
+
+          data[
+            'last_' + key
+          ] = value;
+
+
+          /*
+           * Primeira origem.
+           */
+
+          if (
+            !data[
+              'first_' + key
+            ]
+          ) {
+
+            data[
+              'first_' + key
+            ] = value;
+
+          }
+
+        }
+
+      }
+    );
+
+
+    /* =======================================================
+       IDENTIFICA A ORIGEM SOMENTE COM BASE NA VISITA ATUAL
+       OU NA PRIMEIRA ORIGEM REGISTRADA.
+       
+       Isso evita que um fbclid antigo seja usado
+       para classificar uma nova visita sem parâmetros.
+       ======================================================= */
+
+    var currentGoogle =
+      !!(
+        current.gclid ||
+        current.gbraid ||
+        current.wbraid
+      );
+
+    var currentMeta =
+      !!current.fbclid;
+
+
+    if (currentMeta) {
+
+      data.last_channel =
+        'Meta Ads';
+
+    } else if (currentGoogle) {
+
+      data.last_channel =
+        'Google Ads';
+
+    }
+
+
+    /*
+     * First channel só é definido uma vez.
+     */
+
+    if (
+      !data.first_channel
+    ) {
+
+      if (currentMeta) {
+
+        data.first_channel =
+          'Meta Ads';
+
+      } else if (currentGoogle) {
+
+        data.first_channel =
+          'Google Ads';
+
+      } else if (
+        current.utm_source
+      ) {
+
+        data.first_channel =
+          current.utm_source;
+
+      }
+
+    }
+
+
+    /* =======================================================
+       PÁGINA DE ENTRADA
+       ======================================================= */
+
+    if (
+      !data.first_page
+    ) {
+
+      data.first_page =
+        window.location.href;
+
+    }
+
+
+    if (
+      !data.first_page_path
+    ) {
+
+      data.first_page_path =
+        window.location.pathname +
+        window.location.search;
+
+    }
+
+
+    /*
+     * Última página.
+     */
+
+    data.last_page =
+      window.location.href;
+
+
+    data.last_page_path =
+      window.location.pathname +
+      window.location.search;
+
+
+    data.last_visit_at =
+      new Date().toISOString();
+
+
+    /*
+     * Dados Meta Pixel.
+     */
+
+    var metaData =
+      getMetaBrowserData();
+
+
+    if (metaData.fbp) {
+
+      data.fbp =
+        metaData.fbp;
+
+    }
+
+
+    if (metaData.fbc) {
+
+      data.fbc =
+        metaData.fbc;
+
+    }
+
+
+    saveStoredData(data);
+
+    return data;
+  }
+
+
+  /* =========================================================
+     DADOS DE ATRIBUIÇÃO
+     ========================================================= */
+
+  function getAttributionData() {
+
+    var data =
+      getStoredData();
+
+    var metaData =
+      getMetaBrowserData();
+
+
+    return {
+
+      lead_id:
+        data.lead_id ||
+        getLeadId(),
+
+
+      first_channel:
+        data.first_channel || '',
+
+
+      last_channel:
+        data.last_channel || '',
+
+
+      first_gclid:
+        data.first_gclid || '',
+
+      last_gclid:
+        data.last_gclid || '',
+
+
+      first_gbraid:
+        data.first_gbraid || '',
+
+      last_gbraid:
+        data.last_gbraid || '',
+
+
+      first_wbraid:
+        data.first_wbraid || '',
+
+      last_wbraid:
+        data.last_wbraid || '',
+
+
+      first_fbclid:
+        data.first_fbclid || '',
+
+      last_fbclid:
+        data.last_fbclid || '',
+
+
+      first_utm_source:
+        data.first_utm_source || '',
+
+      first_utm_medium:
+        data.first_utm_medium || '',
+
+      first_utm_campaign:
+        data.first_utm_campaign || '',
+
+      first_utm_content:
+        data.first_utm_content || '',
+
+      first_utm_term:
+        data.first_utm_term || '',
+
+
+      last_utm_source:
+        data.last_utm_source || '',
+
+      last_utm_medium:
+        data.last_utm_medium || '',
+
+      last_utm_campaign:
+        data.last_utm_campaign || '',
+
+      last_utm_content:
+        data.last_utm_content || '',
+
+      last_utm_term:
+        data.last_utm_term || '',
+
+
+      fbp:
+        data.fbp ||
+        metaData.fbp ||
+        '',
+
+      fbc:
+        data.fbc ||
+        metaData.fbc ||
+        '',
+
+
+      first_page:
+        data.first_page || '',
+
+      first_page_path:
+        data.first_page_path || '',
+
+      last_page:
+        data.last_page || '',
+
+      last_page_path:
+        data.last_page_path || '',
+
+      last_visit_at:
+        data.last_visit_at || ''
+
+    };
+
+  }
+
+
+  /* =========================================================
+     SEÇÃO DO SITE
+     ========================================================= */
+
+  function getSectionName(link) {
+
+    var section =
+      link.closest(
+        'section, nav, footer, .topbar'
+      );
+
+    if (!section) {
+
+      return 'site';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'hero'
+      )
+    ) {
+
+      return 'hero';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'navbar'
+      )
+    ) {
+
+      return 'navbar';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'produtos'
+      )
+    ) {
+
+      return 'produtos';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'prova-social'
+      )
+    ) {
+
+      return 'prova_social';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'diferenciais'
+      )
+    ) {
+
+      return 'diferenciais';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'como'
+      )
+    ) {
+
+      return 'como_funciona';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'emocional'
+      )
+    ) {
+
+      return 'emocional';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'cta-final'
+      )
+    ) {
+
+      return 'cta_final';
+
+    }
+
+
+    if (
+      section.tagName &&
+      section.tagName.toLowerCase() ===
+      'footer'
+    ) {
+
+      return 'footer';
+
+    }
+
+
+    if (
+      section.classList.contains(
+        'topbar'
+      )
+    ) {
+
+      return 'topbar';
+
+    }
+
+
+    return (
+      section.id ||
+      section.className ||
+      'site'
+    )
+      .toString()
+      .trim()
+      .replace(
+        /\s+/g,
+        '_'
+      )
+      .toLowerCase();
+
+  }
+
+
+  /* =========================================================
+     NOME DO BOTÃO / PRODUTO
+     ========================================================= */
+
+  function getWhatsappLabel(link) {
+
+    if (
+      link.dataset.whatsappLabel
+    ) {
+
+      return link.dataset.whatsappLabel;
+
+    }
+
+
+    var title =
+      (
+        link.getAttribute(
+          'title'
+        ) || ''
+      ).trim();
+
+
+    if (title) {
+
+      return title;
+
+    }
+
+
+    var card =
+      link.closest('.card');
+
+
+    if (card) {
+
+      var cardTitle =
+        card.querySelector(
+          '.card-title'
+        );
+
+
+      if (cardTitle) {
+
+        return cardTitle
+          .textContent
+          .trim();
+
+      }
+
+    }
+
+
+    if (
+      link.classList.contains(
+        'float-wpp'
+      )
+    ) {
+
+      return 'Botao flutuante WhatsApp';
+
+    }
+
+
+    if (
+      link.classList.contains(
+        'footer-wpp'
+      )
+    ) {
+
+      return 'Botao WhatsApp rodape';
+
+    }
+
+
+    if (
+      link.classList.contains(
+        'btn-wpp'
+      )
+    ) {
+
+      var section =
+        getSectionName(link);
+
+
+      if (
+        section === 'navbar'
+      ) {
+
+        return 'Botao WhatsApp navbar';
+
+      }
+
+
+      if (
+        section === 'hero'
+      ) {
+
+        return 'Botao WhatsApp hero';
+
+      }
+
+
+      if (
+        section === 'emocional'
+      ) {
+
+        return 'Botao WhatsApp bloco emocional';
+
+      }
+
+
+      if (
+        section === 'cta_final'
+      ) {
+
+        return 'Botao WhatsApp CTA final';
+
+      }
+
+
+      if (
+        section === 'footer'
+      ) {
+
+        return 'Botao WhatsApp footer';
+
+      }
+
+    }
+
+
+    var text =
+      (
+        link.textContent ||
+        ''
+      )
+        .replace(
+          /\s+/g,
+          ' '
+        )
+        .trim();
+
+
+    if (text) {
+
+      return text;
+
+    }
+
+
+    return 'WhatsApp';
+
+  }
+
+
+  /* =========================================================
+     TEXTO ORIGINAL DO WHATSAPP
+     ========================================================= */
+
+  function getWhatsappMessage(link) {
+
+    var href =
+      link.getAttribute(
+        'href'
+      ) || '';
+
+
+    try {
+
+      var match =
+        href.match(
+          /[?&]text=([^&]+)/
+        );
+
+
+      if (
+        match &&
+        match[1]
+      ) {
+
+        return decodeURIComponent(
+          match[1]
+        )
+          .replace(
+            /\+/g,
+            ' '
+          );
+
+      }
+
+    } catch (e) {}
+
+
+    return '';
+
+  }
+
+
+  /* =========================================================
+     CONSTRÓI LINK WHATSAPP
+     
+     NÃO adiciona Lead ID.
+     NÃO adiciona fbclid.
+     NÃO adiciona nenhum código.
+     ========================================================= */
+
+  function buildWhatsappUrl(link) {
+
+    var href =
+      link.getAttribute(
+        'href'
+      ) || '';
+
+
+    if (
+      !href ||
+      href.indexOf(
+        'wa.me/'
+      ) === -1
+    ) {
+
+      return href;
+
+    }
+
+
+    var originalMessage =
+      getWhatsappMessage(link);
+
+
+    try {
+
+      var base =
+        href.split('?')[0];
+
+
+      if (originalMessage) {
+
+        return (
+          base +
+          '?text=' +
+          encodeURIComponent(
+            originalMessage
+          )
+        );
+
+      }
+
+
+      return href;
+
+    } catch (e) {
+
+      return href;
+
+    }
+
+  }
+
+
+  /* =========================================================
+     ENVIO PARA APPS SCRIPT
+     ========================================================= */
+
+  function sendToTrackingEndpoint(
+    payload
+  ) {
+
+    if (
+      !TRACKING_ENDPOINT
+    ) {
+
+      return;
+
+    }
+
+
+    try {
+
+      var body =
+        'payload=' +
+        encodeURIComponent(
+          JSON.stringify(
+            payload
+          )
+        );
+
+
+      if (
+        navigator.sendBeacon
+      ) {
+
+        var blob =
+          new Blob(
+            [body],
+            {
+              type:
+                'application/x-www-form-urlencoded;charset=UTF-8'
+            }
+          );
+
+
+        var enviado =
+          navigator.sendBeacon(
+            TRACKING_ENDPOINT,
+            blob
+          );
+
+
+        if (enviado) {
+
+          return;
+
+        }
+
+      }
+
+
+      fetch(
+        TRACKING_ENDPOINT,
+        {
+
+          method:
+            'POST',
+
+          headers: {
+
+            'Content-Type':
+              'application/x-www-form-urlencoded;charset=UTF-8'
+
+          },
+
+          body:
+            body,
+
+          keepalive:
+            true
+
+        }
+      ).catch(
+        function () {}
+      );
+
+
+    } catch (e) {
+
+      /*
+       * Nunca bloquear o WhatsApp.
+       */
+
+    }
+
+  }
+
+
+  /* =========================================================
+     CLIQUE NO WHATSAPP
+     ========================================================= */
+
+  function trackWhatsappClick(
+    link
+  ) {
+
+    /*
+     * Atualiza/captura atribuição antes
+     * de registrar o clique.
+     */
+
+    captureAttribution();
+
+
+    var attribution =
+      getAttributionData();
+
+
+    var label =
+      getWhatsappLabel(link);
+
+
+    var section =
+      getSectionName(link);
+
+
+    var originalHref =
+      link.getAttribute(
+        'href'
+      ) || '';
+
+
+    var whatsappUrl =
+      buildWhatsappUrl(link);
+
+
+    var buttonText =
+      (
+        link.textContent ||
+        ''
+      )
+        .replace(
+          /\s+/g,
+          ' '
+        )
+        .trim();
+
+
+    /*
+     * Identificador único do clique.
+     */
+
+    var eventId =
+      generateId();
+
+
+    var payload = {
+
+      event:
+        'click_whatsapp',
+
+
+      event_id:
+        eventId,
+
+
+      timestamp:
+        new Date().toISOString(),
+
+
+      lead_id:
+        attribution.lead_id,
+
+
+      button_name:
+        label,
+
+
+      button_location:
+        section,
+
+
+      button_text:
+        buttonText,
+
+
+      whatsapp_url:
+        whatsappUrl,
+
+
+      original_whatsapp_url:
+        originalHref,
+
+
+      product:
+        label,
+
+
+      /* =========================
+         GOOGLE
+         ========================= */
+
+      gclid:
+        attribution.last_gclid ||
+        attribution.first_gclid ||
+        '',
+
+
+      gbraid:
+        attribution.last_gbraid ||
+        attribution.first_gbraid ||
+        '',
+
+
+      wbraid:
+        attribution.last_wbraid ||
+        attribution.first_wbraid ||
+        '',
+
+
+      /* =========================
+         META
+         ========================= */
+
+      fbclid:
+        attribution.last_fbclid ||
+        attribution.first_fbclid ||
+        '',
+
+
+      fbp:
+        attribution.fbp ||
+        '',
+
+
+      fbc:
+        attribution.fbc ||
+        '',
+
+
+      /* =========================
+         UTM
+         ========================= */
+
+      utm_source:
+        attribution.last_utm_source ||
+        attribution.first_utm_source ||
+        '',
+
+
+      utm_medium:
+        attribution.last_utm_medium ||
+        attribution.first_utm_medium ||
+        '',
+
+
+      utm_campaign:
+        attribution.last_utm_campaign ||
+        attribution.first_utm_campaign ||
+        '',
+
+
+      utm_content:
+        attribution.last_utm_content ||
+        attribution.first_utm_content ||
+        '',
+
+
+      utm_term:
+        attribution.last_utm_term ||
+        attribution.first_utm_term ||
+        '',
+
+
+      /* =========================
+         ORIGEM
+         ========================= */
+
+      first_channel:
+        attribution.first_channel ||
+        '',
+
+
+      last_channel:
+        attribution.last_channel ||
+        '',
+
+
+      /* =========================
+         PÁGINAS
+         ========================= */
+
+      first_page:
+        attribution.first_page ||
+        '',
+
+
+      first_page_path:
+        attribution.first_page_path ||
+        '',
+
+
+      current_page:
+        window.location.href
+
+    };
+
+
+    /* =======================================================
+       1. DATA LAYER
+       ======================================================= */
+
+    window.dataLayer =
+      window.dataLayer || [];
+
+
+    window.dataLayer.push({
+
+      event:
+        'click_whatsapp',
+
+
+      lead_id:
+        payload.lead_id,
+
+
+      button_name:
+        payload.button_name,
+
+
+      button_location:
+        payload.button_location,
+
+
+      button_text:
+        payload.button_text,
+
+
+      product:
+        payload.product,
+
+
+      gclid:
+        payload.gclid,
+
+
+      gbraid:
+        payload.gbraid,
+
+
+      wbraid:
+        payload.wbraid,
+
+
+      fbclid:
+        payload.fbclid,
+
+
+      fbp:
+        payload.fbp,
+
+
+      fbc:
+        payload.fbc,
+
+
+      utm_source:
+        payload.utm_source,
+
+
+      utm_medium:
+        payload.utm_medium,
+
+
+      utm_campaign:
+        payload.utm_campaign,
+
+
+      utm_content:
+        payload.utm_content,
+
+
+      utm_term:
+        payload.utm_term
+
+    });
+
+
+    /* =======================================================
+       2. GA4
+       ======================================================= */
+
+    if (
+      typeof window.gtag ===
+      'function'
+    ) {
+
+      window.gtag(
+        'event',
+        'click_whatsapp',
+        {
+
+          event_category:
+            'engagement',
+
+
+          event_label:
+            label,
+
+
+          lead_id:
+            payload.lead_id,
+
+
+          button_name:
+            label,
+
+
+          button_location:
+            section,
+
+
+          button_text:
+            buttonText,
+
+
+          product:
+            label,
+
+
+          gclid:
+            payload.gclid,
+
+
+          gbraid:
+            payload.gbraid,
+
+
+          wbraid:
+            payload.wbraid,
+
+
+          fbclid:
+            payload.fbclid,
+
+
+          fbp:
+            payload.fbp,
+
+
+          fbc:
+            payload.fbc,
+
+
+          utm_source:
+            payload.utm_source,
+
+
+          utm_medium:
+            payload.utm_medium,
+
+
+          utm_campaign:
+            payload.utm_campaign,
+
+
+          utm_content:
+            payload.utm_content,
+
+
+          utm_term:
+            payload.utm_term,
+
+
+          transport_type:
+            'beacon'
+
+        }
+      );
+
+    }
+
+
+    /* =======================================================
+       3. META PIXEL
+       ======================================================= */
+
+    if (
+      typeof window.fbq ===
+      'function'
+    ) {
+
+      window.fbq(
+        'track',
+        'Contact',
+        {
+
+          content_name:
+            'WhatsApp - ' +
+            label,
+
+
+          content_category:
+            'WhatsApp',
+
+
+          lead_id:
+            payload.lead_id,
+
+
+          button_name:
+            label,
+
+
+          button_location:
+            section,
+
+
+          product:
+            label,
+
+
+          fbclid:
+            payload.fbclid,
+
+
+          fbp:
+            payload.fbp,
+
+
+          fbc:
+            payload.fbc,
+
+
+          utm_source:
+            payload.utm_source,
+
+
+          utm_medium:
+            payload.utm_medium,
+
+
+          utm_campaign:
+            payload.utm_campaign,
+
+
+          utm_content:
+            payload.utm_content,
+
+
+          utm_term:
+            payload.utm_term
+
+        }
+      );
+
+    }
+
+
+    /* =======================================================
+       4. GOOGLE SHEETS / APPS SCRIPT
+       ======================================================= */
+
+    sendToTrackingEndpoint(
+      payload
+    );
+
+
+    /* =======================================================
+       5. SALVA ÚLTIMO CLIQUE
+       ======================================================= */
+
+    var data =
+      getStoredData();
+
+
+    data.last_whatsapp_click =
+      payload;
+
+
+    data.last_whatsapp_click_at =
+      new Date().toISOString();
+
+
+    saveStoredData(
+      data
+    );
+
+
+    /*
+     * Atualiza o link somente para o clique atual.
+     */
+
+    link.setAttribute(
+      'href',
+      whatsappUrl
+    );
+
+  }
+
+
+  /* =========================================================
+     INICIALIZAÇÃO
+     ========================================================= */
+
+  document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+      /*
+       * 1. Cria ID interno.
+       */
+
+      getLeadId();
+
+
+      /*
+       * 2. Captura origem da visita.
+       */
+
+      var attribution =
+        captureAttribution();
+
+
+      /*
+       * 3. Data Layer.
+       */
+
+      window.dataLayer =
+        window.dataLayer || [];
+
+
+      window.dataLayer.push({
+
+        event:
+          'utm_captured',
+
+
+        lead_id:
+          attribution.lead_id,
+
+
+        first_channel:
+          attribution.first_channel ||
+          '',
+
+
+        last_channel:
+          attribution.last_channel ||
+          '',
+
+
+        gclid:
+          attribution.last_gclid ||
+          attribution.first_gclid ||
+          '',
+
+
+        gbraid:
+          attribution.last_gbraid ||
+          attribution.first_gbraid ||
+          '',
+
+
+        wbraid:
+          attribution.last_wbraid ||
+          attribution.first_wbraid ||
+          '',
+
+
+        fbclid:
+          attribution.last_fbclid ||
+          attribution.first_fbclid ||
+          '',
+
+
+        fbp:
+          attribution.fbp ||
+          '',
+
+
+        fbc:
+          attribution.fbc ||
+          '',
+
+
+        utm_source:
+          attribution.last_utm_source ||
+          attribution.first_utm_source ||
+          '',
+
+
+        utm_medium:
+          attribution.last_utm_medium ||
+          attribution.first_utm_medium ||
+          '',
+
+
+        utm_campaign:
+          attribution.last_utm_campaign ||
+          attribution.first_utm_campaign ||
+          '',
+
+
+        utm_content:
+          attribution.last_utm_content ||
+          attribution.first_utm_content ||
+          '',
+
+
+        utm_term:
+          attribution.last_utm_term ||
+          attribution.first_utm_term ||
+          ''
+
+      });
+
+
+      /*
+       * 4. Localiza todos os links
+       *    que abrem o WhatsApp.
+       */
+
+      var whatsappLinks =
+        document.querySelectorAll(
+          'a[href*="wa.me/"]'
+        );
+
+
+      whatsappLinks.forEach(
+        function (link) {
+
+          link.addEventListener(
+            'click',
+            function () {
+
+              trackWhatsappClick(
+                link
+              );
+
+            },
+            {
+              passive: true
+            }
+          );
+
+        }
+      );
+
+    }
+  );
+
+
+  /* =========================================================
+     META / GA4 — INTENÇÃO DE PRODUTO
+     ========================================================= */
+
+  document
+    .querySelectorAll(
+      '.card-btn'
+    )
+    .forEach(
+      function (link) {
+
+        link.addEventListener(
+          'click',
+          function () {
+
+            var card =
+              link.closest(
+                '.card'
+              );
+
+
+            var title =
+              card &&
+              card.querySelector(
+                '.card-title'
+              )
+                ? card
+                    .querySelector(
+                      '.card-title'
+                    )
+                    .textContent
+                    .trim()
+
+                : 'Produto';
+
+
+            /*
+             * Data Layer.
+             */
+
+            window.dataLayer =
+              window.dataLayer || [];
+
+
+            window.dataLayer.push({
+
+              event:
+                'product_interest',
+
+              product:
+                title
+
+            });
+
+
+            /*
+             * Meta Pixel.
+             */
+
+            if (
+              typeof window.fbq ===
+              'function'
+            ) {
+
+              window.fbq(
+                'track',
+                'ViewContent',
+                {
+
+                  content_name:
+                    title,
+
+                  content_category:
+                    'Produto'
+
+                }
+              );
+
+            }
+
+
+            /*
+             * GA4.
+             */
+
+            if (
+              typeof window.gtag ===
+              'function'
+            ) {
+
+              window.gtag(
+                'event',
+                'view_item',
+                {
+
+                  item_name:
+                    title,
+
+                  content_type:
+                    'product'
+
+                }
+              );
+
+            }
+
+          }
+        );
+
+      }
+    );
+
+
+})();
+</script>
+
 </body>
 </html>
